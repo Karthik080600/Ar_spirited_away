@@ -19,14 +19,14 @@ function coverRect(imgAspect, targetAspect, focus) {
 
 // Flat grid whose vertices follow P(u,v); (u,v) are IMAGE coordinates (v=0 bottom). Subdivided so the texture
 // bends smoothly across the trapezoid instead of showing a diagonal seam.
-function gridMesh(P, rect, map, shade, n = 18) {
+function gridMesh(P, rect, map, shade, n = 18, nv = n, matOpts = {}) {
   const pos = [], uv = [], col = [], idx = [];
-  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
-    const u = i / n, v = j / n, p = P(u, v), s = shade(p.z);
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= n; i++) {
+    const u = i / n, v = j / nv, p = P(u, v), s = shade(p.z);
     pos.push(p.x, p.y, p.z); col.push(s, s, s);
     uv.push(rect[0] + (rect[1] - rect[0]) * u, rect[2] + (rect[3] - rect[2]) * v);
   }
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+  for (let j = 0; j < nv; j++) for (let i = 0; i < n; i++) {
     const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1; idx.push(a, c, b, b, c, d);
   }
   const g = new THREE.BufferGeometry();
@@ -34,7 +34,7 @@ function gridMesh(P, rect, map, shade, n = 18) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
-  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map, vertexColors: true, side: THREE.DoubleSide, toneMapped: false }));
+  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map, vertexColors: true, side: THREE.DoubleSide, toneMapped: false, ...matOpts }));
 }
 
 export async function buildBox(L, { withPoster = false, onProgress = () => {} } = {}) {
@@ -66,8 +66,19 @@ export async function buildBox(L, { withPoster = false, onProgress = () => {} } 
   };
   for (const [name, w] of Object.entries(walls)) {
     const cfg = L.walls[name], map = await loadTex(cfg.img);
-    const rect = coverRect(map.image.width / map.image.height, w.aspect, cfg.focus || [0.5, 0.5]);
+    const rect = coverRect(map.image.width / map.image.height, w.aspect * (cfg.squash ?? 1), cfg.focus || [0.5, 0.5]);
     const m = gridMesh(w.P, rect, map, shade); m.name = 'wall-' + name; root.add(m); tick();
+  }
+
+  // ---- red lattice railings along both edges of the bridge (real 3D, so they sell the depth)
+  if (L.railing) {
+    const rmap = await loadTex(L.railing.img), rh = L.railing.height ?? 0.3;
+    for (const sgn of [-1, 1]) {
+      const P = (u, v) => { const b = V(sgn * W0 / 2, -H0 / 2, 0).lerp(V(sgn * W1 / 2, -H1 / 2, D), 1 - u); b.y += v * rh; return b; };
+      // u=0 -> viewer end, u=1 -> poster end of the texture so posts line up on both sides
+      const m = gridMesh(P, [0, 1, 0, 1], rmap, shade, 10, 1, { transparent: true, alphaTest: 0.02, depthWrite: false });
+      m.renderOrder = -1; m.name = 'rail'; root.add(m);
+    }
   }
 
   if (withPoster) {   // stand-in for the physical poster when there is no tracking (preview / placement mode)

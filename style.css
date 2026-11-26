@@ -24,3 +24,8 @@ button.link{background:none;border:0;color:#fff;opacity:.7;text-decoration:under
 .icon.off{opacity:.45;text-decoration:line-through}
 .spinner{width:40px;height:40px;border:4px solid #fff3;border-top-color:var(--gold);border-radius:50%;animation:s 1s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
+
+.intro{background:#0b1522;overflow:hidden}
+.intro video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.95}
+.intro .shade{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 55%,rgba(7,14,24,.55),rgba(7,14,24,.86) 80%)}
+.intro .card{position:relative;z-index:1;text-shadow:0 2px 14px #000a}

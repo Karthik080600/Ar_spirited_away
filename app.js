@@ -16,8 +16,16 @@ function hint(msg) { if (!msg) return show('hint', false); $('hint').textContent
 function fail(msg) { show('loading', false); show('start', false); $('errMsg').textContent = msg; show('error'); }
 async function exists(url) { try { return (await fetch(url, { method: 'HEAD', cache: 'no-store' })).ok; } catch { return false; } }
 
+// ------------------------------------------------------------------ start-screen trailer (muted, looping)
+function startIntro() {
+  const v = $('introVideo'), i = L.intro; if (!i) return;
+  if (i.poster) v.poster = i.poster; v.muted = true; v.src = i.video; v.play().catch(() => {});
+}
+function stopIntro() { const v = $('introVideo'); v.pause(); v.removeAttribute('src'); v.load(); }
+
 // ------------------------------------------------------------------ audio (music loop + tap dialogue)
 function startMusic() {                  // called straight from the button click so the browser allows playback
+  stopIntro();
   const a = new Audio(L.music); a.loop = true; a.volume = 0.45;
   a.addEventListener('error', () => { audio.music = null; show('btnMute', false); });
   a.play().then(() => { audio.music = a; show('btnMute'); }).catch(() => {});
@@ -191,5 +199,5 @@ $('btnPreview').onclick = async () => { const motionOK = await motionPermission(
 (async () => {
   try { L = await (await fetch('layout.json', { cache: 'no-store' })).json(); }
   catch (e) { return fail('Could not load layout.json — make sure it is uploaded next to index.html.'); }
-  if (params.has('preview')) startPlacement({ camera: false, motionOK: false });
+  if (params.has('preview')) startPlacement({ camera: false, motionOK: false }); else startIntro();
 })();

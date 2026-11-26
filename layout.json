@@ -16,28 +16,32 @@
       "focus": [
         0.5,
         0.5
-      ]
+      ],
+      "squash": 1.0
     },
     "bottom": {
+      "img": "assets/deck.jpg",
+      "focus": [
+        0.5,
+        0.5
+      ],
+      "squash": 1.14
+    },
+    "left": {
       "img": "assets/bg_train.jpg",
       "focus": [
         0.5,
         0.5
-      ]
-    },
-    "left": {
-      "img": "assets/bg_hall.jpg",
-      "focus": [
-        0.5,
-        0.5
-      ]
+      ],
+      "squash": 1.8
     },
     "right": {
       "img": "assets/bg_bathhouse.jpg",
       "focus": [
         0.5,
         0.45
-      ]
+      ],
+      "squash": 0.91
     }
   },
   "music": "assets/music.mp3",
@@ -45,74 +49,82 @@
     {
       "name": "No-Face",
       "img": "assets/noface.png",
-      "h": 0.66,
-      "x": -0.8,
-      "z": 0.18,
+      "h": 0.74,
+      "x": -0.64,
+      "z": 0.22,
       "line": "…ah… ah…",
       "audio": "assets/voice/noface.mp3"
     },
     {
       "name": "Kamaji",
       "img": "assets/kamaji.png",
-      "h": 0.52,
-      "x": -1.02,
-      "z": 0.62,
+      "h": 0.58,
+      "x": -0.8,
+      "z": 0.42,
       "line": "Six arms, and still not enough hands!",
       "audio": "assets/voice/kamaji.mp3"
     },
     {
       "name": "Lin",
       "img": "assets/lin.png",
-      "h": 0.58,
-      "x": -0.62,
-      "z": 0.92,
+      "h": 0.64,
+      "x": -0.5,
+      "z": 0.86,
       "line": "Keep up! The bathhouse never sleeps.",
       "audio": "assets/voice/lin.mp3"
     },
     {
       "name": "Haku",
       "img": "assets/haku_human.png",
-      "h": 0.6,
-      "x": -0.98,
-      "z": 1.12,
+      "h": 0.68,
+      "x": -0.95,
+      "z": 1.1,
       "line": "Stay close. I'll show you the way.",
       "audio": "assets/voice/haku.mp3"
     },
     {
       "name": "Yubaba",
       "img": "assets/yubaba.png",
-      "h": 0.5,
-      "x": 1.0,
-      "z": 0.55,
+      "h": 0.56,
+      "x": 0.86,
+      "z": 0.95,
       "line": "A contract is a contract. Sign here.",
       "audio": "assets/voice/yubaba.mp3"
     },
     {
       "name": "Oshira-sama",
       "img": "assets/oshira.png",
-      "h": 0.52,
-      "x": 0.66,
-      "z": 0.22,
+      "h": 0.58,
+      "x": 0.62,
+      "z": 0.35,
       "line": "Mmm… what a long journey.",
       "audio": "assets/voice/oshira.mp3"
     },
     {
       "name": "Boh",
       "img": "assets/boh.png",
-      "h": 0.24,
-      "x": 0.74,
-      "z": 0.98,
+      "h": 0.3,
+      "x": 0.52,
+      "z": 1.05,
       "line": "Play with me!",
       "audio": "assets/voice/boh.mp3"
     },
     {
       "name": "Yellow chick",
       "img": "assets/chick.png",
-      "h": 0.26,
-      "x": 1.12,
-      "z": 1.08,
+      "h": 0.3,
+      "x": 1.08,
+      "z": 1.18,
       "line": "Peep peep!",
       "audio": "assets/voice/chick.mp3"
     }
-  ]
+  ],
+  "railing": {
+    "img": "assets/rail.png",
+    "height": 0.3
+  },
+  "intro": {
+    "video": "assets/intro.mp4",
+    "poster": "assets/intro_poster.jpg"
+  }
 }
