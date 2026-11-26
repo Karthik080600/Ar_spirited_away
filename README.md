@@ -1,24 +1,33 @@
-# Spirited Away AR poster (prototype v0.1)
+# Spirited Away AR poster — v0.3 (box layout)
 
-**Flow:** QR on the frame → opens this site → camera → point at the poster → the world around the frame appears; move your phone up/down/left/right to look around.
+The poster is the **back wall of a box**. Top / bottom / left / right are extensions of the poster's world,
+the characters stand on the floor, and you look around by moving your phone. Tap a character → caption (+ voice if you add audio).
 
-## Deploy (GitHub Pages)
-1. Push this whole folder to a repo → Settings → Pages → deploy from `main` / root.
-2. Open `https://<you>.github.io/<repo>/qr.html`, print the QR, stick it on the frame.
-3. Camera needs HTTPS — GitHub Pages provides it.
+## Files
+- `index.html`, `app.js`, `scene.js`, `style.css` – the app
+- `layout.json` – **everything you tune**: box size, wall images, characters (image, height, x, z), dialogue lines, audio paths
+- `assets/` – images, plus optional `assets/music.mp3` and `assets/voice/<name>.mp3`
+- `targets.mind` – poster tracking file (you create it once, see below)
 
-## Test without printing
-`https://<you>.github.io/<repo>/?preview` — no camera, drag to orbit, pinch to zoom.
+## 1. Make the tracking file (do this once, ~1 minute)
+1. Open https://hiukim.github.io/mind-ar-js-doc/tools/compile
+2. Upload `assets/poster_target.jpg` → **Start** → **Download** (`targets.mind`)
+3. Upload `targets.mind` to the repo next to `index.html`.
+Without it the site falls back to "placement mode" (no poster lock; the box floats in front of the camera and follows your phone's motion).
 
-## Poster tracking
-- First launch compiles `assets/poster_target.jpg` in the browser (~20s, then cached on that phone).
-- To skip that: open the site once, in the browser console run `downloadMind()`, and commit the downloaded `targets.mind` next to `index.html`.
-- Better tracking = better target image. Replace `assets/poster_target.jpg` with a clean straight-on scan (no glare, no frame).
+## 2. Deploy
+GitHub repo → upload everything (keep the `assets` folder) → Settings → Pages → `main` / root. Camera needs HTTPS (GitHub Pages is HTTPS).
 
-## Editing the scene
-Everything lives in `scene.js`: `PANELS` (2D backgrounds) and `CHARACTERS` (transparent PNG cut-outs with x/y/z, height). Drop new full-body PNGs in `assets/` and add a line.
+## Test without a camera
+Add `?preview` to the URL: drag to look around, pinch/scroll to zoom, tap characters.
 
-## Known limits of v0.1
-- Tracking needs the poster in view. Panels beside the poster work when you hold the phone far enough back to see part of the poster; fully off-poster viewing needs a gyro-based hand-off (next phase).
-- Characters are flat cut-outs with depth layers, parallax, idle float and limited turn-toward-you — not real 360° models. A `.glb` swap is possible later.
-- Artwork belongs to Studio Ghibli — fine for a class demo, get permission before publishing publicly.
+## Music and voices
+- Put your loop at `assets/music.mp3` (plays after tapping Start; ♪ button mutes).
+- Put voice clips in `assets/voice/` using the names in `layout.json` (`kamaji.mp3`, `lin.mp3` …). Captions show even without audio.
+- Captions in `layout.json` are placeholders — edit the `line` fields.
+
+## URL switches (debugging)
+`?nogyro` turns off the gyroscope hand-off · `?gyroflip` reverses its direction if the box moves the wrong way when the poster leaves view.
+
+## Notes
+- Artwork belongs to Studio Ghibli: fine for a class/demo, get permission before publishing publicly.

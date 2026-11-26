@@ -1,90 +1,112 @@
-// Shared scene definition. Units: 1 = poster width. Poster centre = (0,0). +x right, +y up, +z toward the viewer.
+// Builds the "shadow box": the poster is the BACK wall; top / bottom / left / right are extensions of the
+// poster's world that flare out toward the viewer. Characters stand on the floor.
+// Units: 1 = poster width. Poster centre = (0,0,0). +x right, +y up, +z toward the viewer.
 import * as THREE from 'three';
 
-export const POSTER = { w: 1, h: 940 / 674 };   // poster_target.jpg aspect
-
-// ---- EDIT HERE: 2D backgrounds placed around the poster -----------------------
-export const PANELS = [
-  { name: 'dragon',    img: 'assets/bg_dragon_strip.jpg',        w: 1.50, x: 0,     y: 1.28,  z: -0.05 }, // above
-  { name: 'train',     img: 'assets/bg_train.jpg',               w: 1.50, x: 0,     y: -1.22, z: -0.05 }, // below
-  { name: 'bathhouse', img: 'assets/bg_bathhouse.jpg',           w: 1.00, x: 1.08,  y: 0,     z: -0.05 }, // right
-  { name: 'bridge',    img: 'assets/bg_bathhouse_chihiro.jpg',   w: 0.70, x: 2.00,  y: 0,     z: -0.10 }, // far right
-  { name: 'hall',      img: 'assets/bg_hall.jpg',                w: 1.55, x: -1.30, y: 0,     z: -0.05 }, // left
-];
-
-// ---- EDIT HERE: characters (transparent PNG cut-outs) standing in front of panels ----
-// h = height in poster-widths, z = distance in front of the panel (depth layering)
-export const CHARACTERS = [
-  // left: golden hall
-  { name: 'kamaji',  img: 'assets/kamaji.png',      h: 0.62, x: -1.62, y: -0.10, z: 0.18 },
-  { name: 'lin',     img: 'assets/lin.png',         h: 0.58, x: -1.15, y: -0.12, z: 0.26 },
-  { name: 'haku',    img: 'assets/haku_human.png',  h: 0.55, x: -0.82, y: -0.16, z: 0.32 },
-  { name: 'noface',  img: 'assets/noface.png',      h: 0.70, x: -1.30, y: 0.10,  z: 0.10 },
-  // right: bathhouse (Yubaba in the middle)
-  { name: 'yubaba',  img: 'assets/yubaba.png',      h: 0.40, x: 1.08,  y: -0.32, z: 0.22 },
-  { name: 'oshira',  img: 'assets/oshira.png',      h: 0.42, x: 1.38,  y: -0.18, z: 0.16 },
-  { name: 'boh',     img: 'assets/boh.png',         h: 0.22, x: 0.80,  y: -0.50, z: 0.34 },
-  { name: 'chick',   img: 'assets/chick.png',       h: 0.26, x: 1.30,  y: -0.54, z: 0.36 },
-  // far right: bridge
-  { name: 'chihiro', img: 'assets/chihiro.png',     h: 0.70, x: 2.00,  y: -0.42, z: 0.22 },
-  // TODO: haku-dragon cutout
-];
-
 const loader = new THREE.TextureLoader();
-function tex(url) {
-  return new Promise((res, rej) => loader.load(url, t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }, undefined, rej));
+const loadTex = url => new Promise((res, rej) => loader.load(url, t => {
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.generateMipmaps = true; res(t);
+}, undefined, () => rej(new Error('Could not load ' + url))));
+
+// crop an image to a target aspect ("object-fit: cover"), centred on `focus` (fractions, y from the top)
+function coverRect(imgAspect, targetAspect, focus) {
+  let w = 1, h = 1;
+  if (imgAspect > targetAspect) w = targetAspect / imgAspect; else h = imgAspect / targetAspect;
+  const cx = Math.min(Math.max(focus[0], w / 2), 1 - w / 2);
+  const cy = Math.min(Math.max(1 - focus[1], h / 2), 1 - h / 2);   // flip: three.js v=0 is the bottom
+  return [cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2];
 }
 
-export async function buildWorld(onProgress = () => {}) {
+// Flat grid whose vertices follow P(u,v); (u,v) are IMAGE coordinates (v=0 bottom). Subdivided so the texture
+// bends smoothly across the trapezoid instead of showing a diagonal seam.
+function gridMesh(P, rect, map, shade, n = 18) {
+  const pos = [], uv = [], col = [], idx = [];
+  for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+    const u = i / n, v = j / n, p = P(u, v), s = shade(p.z);
+    pos.push(p.x, p.y, p.z); col.push(s, s, s);
+    uv.push(rect[0] + (rect[1] - rect[0]) * u, rect[2] + (rect[3] - rect[2]) * v);
+  }
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1; idx.push(a, c, b, b, c, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map, vertexColors: true, side: THREE.DoubleSide, toneMapped: false }));
+}
+
+export async function buildBox(L, { withPoster = false, onProgress = () => {} } = {}) {
+  const W0 = L.poster.w, H0 = L.poster.h, D = L.box.depth, W1 = L.box.frontW, H1 = L.box.frontH;
+  const dim = L.box.dimFront ?? 0.55;
+  const shade = z => 1 - (1 - dim) * Math.max(0, Math.min(1, z / D));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const floorY = z => -(H0 / 2 + (H1 - H0) / 2 * (z / D));
   const root = new THREE.Group();
-  const billboards = [];
-  const total = PANELS.length + CHARACTERS.length; let done = 0;
+  const total = 4 + L.characters.length + (withPoster ? 1 : 0); let done = 0;
+  const tick = () => onProgress(++done / total);
 
-  // glowing outline around the real poster = visual "tracking locked" cue
-  const frame = new THREE.Mesh(
-    new THREE.PlaneGeometry(POSTER.w + 0.05, POSTER.h + 0.05),
-    new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0.55 }));
-  frame.position.z = -0.004; root.add(frame);
-
-  for (const p of PANELS) {
-    const t = await tex(p.img);
-    const h = p.w * t.image.height / t.image.width;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(p.w, h), new THREE.MeshBasicMaterial({ map: t, toneMapped: false }));
-    m.position.set(p.x, p.y, p.z);
-    const edge = new THREE.Mesh(new THREE.PlaneGeometry(p.w + 0.03, h + 0.03), new THREE.MeshBasicMaterial({ color: 0x0d1b2a }));
-    edge.position.set(p.x, p.y, p.z - 0.002);
-    root.add(edge, m); onProgress(++done / total);
+  // ---- walls (each is an extension of the poster: the image edge that touches the poster sits on the poster edge)
+  const lenSide = Math.hypot(D, (W1 - W0) / 2), lenVert = Math.hypot(D, (H1 - H0) / 2);
+  const walls = {
+    top: { // image bottom meets poster top; image top is at the viewer
+      aspect: ((W0 + W1) / 2) / lenVert,
+      P: (u, v) => { const b = V(-W0 / 2 + u * W0, H0 / 2, 0), f = V(-W1 / 2 + u * W1, H1 / 2, D); return b.lerp(f, v); } },
+    bottom: { // floor: image top meets poster bottom; image bottom is at the viewer
+      aspect: ((W0 + W1) / 2) / lenVert,
+      P: (u, v) => { const b = V(-W0 / 2 + u * W0, -H0 / 2, 0), f = V(-W1 / 2 + u * W1, -H1 / 2, D); return b.lerp(f, 1 - v); } },
+    left: { // image right edge meets poster left edge
+      aspect: lenSide / ((H0 + H1) / 2),
+      P: (u, v) => { const b = V(-W0 / 2, -H0 / 2 + v * H0, 0), f = V(-W1 / 2, -H1 / 2 + v * H1, D); return b.lerp(f, 1 - u); } },
+    right: { // image left edge meets poster right edge
+      aspect: lenSide / ((H0 + H1) / 2),
+      P: (u, v) => { const b = V(W0 / 2, -H0 / 2 + v * H0, 0), f = V(W1 / 2, -H1 / 2 + v * H1, D); return b.lerp(f, u); } },
+  };
+  for (const [name, w] of Object.entries(walls)) {
+    const cfg = L.walls[name], map = await loadTex(cfg.img);
+    const rect = coverRect(map.image.width / map.image.height, w.aspect, cfg.focus || [0.5, 0.5]);
+    const m = gridMesh(w.P, rect, map, shade); m.name = 'wall-' + name; root.add(m); tick();
   }
 
-  for (const c of CHARACTERS) {
-    const t = await tex(c.img);
-    const w = c.h * t.image.width / t.image.height;
-    const g = new THREE.Group(); g.position.set(c.x, c.y, c.z);
-    // soft contact shadow so they read as standing in the world
-    const sh = document.createElement('canvas'); sh.width = sh.height = 64;
-    const x = sh.getContext('2d'); const gr = x.createRadialGradient(32, 32, 2, 32, 32, 30);
-    gr.addColorStop(0, 'rgba(0,0,0,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
-    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.1, w * 0.3),
-      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sh), transparent: true, depthWrite: false }));
-    shadow.position.set(0, -c.h / 2 + 0.01, -0.01);
+  if (withPoster) {   // stand-in for the physical poster when there is no tracking (preview / placement mode)
+    const map = await loadTex(L.poster.img);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(W0, H0), new THREE.MeshBasicMaterial({ map, toneMapped: false }));
+    m.position.z = 0.001; root.add(m); tick();
+  }
+
+  // ---- characters: upright cut-outs standing on the (sloped) floor
+  const slope = Math.atan(((H1 - H0) / 2) / D);
+  const shadowTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    const g = x.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(0,0,0,.6)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
+  })();
+  const chars = [], hit = [];
+  for (const c of L.characters) {
+    const map = await loadTex(c.img), w = c.h * map.image.width / map.image.height;
+    const g = new THREE.Group(); const baseY = floorY(c.z) + c.h / 2; g.position.set(c.x, baseY, c.z);
     const body = new THREE.Mesh(new THREE.PlaneGeometry(w, c.h),
-      new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.04, toneMapped: false }));
+      new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.06, toneMapped: false }));
+    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.15, Math.max(w * 0.32, 0.08)),
+      new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2 + slope; shadow.position.set(0, -c.h / 2 + 0.004, 0.004);
     g.add(shadow, body); root.add(g);
-    billboards.push({ g, body, baseY: c.y, phase: Math.random() * 6.28 });
-    onProgress(++done / total);
+    body.userData.char = c; hit.push(body);
+    chars.push({ g, body, c, baseY, phase: Math.random() * 6.28, hop: -10 }); tick();
   }
 
-  // per-frame: characters turn toward the viewer (limited yaw) + gentle idle float => reads as 3D while you move
-  const v = new THREE.Vector3();
-  function update(time, camera) {
-    for (const b of billboards) {
-      b.g.updateWorldMatrix(true, false);
-      v.setFromMatrixPosition(b.g.matrixWorld);
-      const local = b.g.parent.worldToLocal(camera.getWorldPosition(new THREE.Vector3()));
-      const yaw = Math.atan2(local.x - b.g.position.x, Math.max(local.z - b.g.position.z, 0.2));
-      b.body.rotation.y = THREE.MathUtils.clamp(yaw, -0.6, 0.6);
-      b.g.position.y = b.baseY + Math.sin(time * 1.4 + b.phase) * 0.006;
+  const camLocal = new THREE.Vector3();
+  function update(t, camera) {
+    camera.getWorldPosition(camLocal); root.worldToLocal(camLocal);
+    for (const k of chars) {
+      const yaw = Math.atan2(camLocal.x - k.g.position.x, Math.max(camLocal.z - k.g.position.z, 0.3));
+      k.body.rotation.y = Math.max(-0.55, Math.min(0.55, yaw));
+      const since = t - k.hop, bounce = since >= 0 && since < 0.45 ? Math.sin(since / 0.45 * Math.PI) * 0.07 : 0;
+      k.g.position.y = k.baseY + Math.sin(t * 1.3 + k.phase) * 0.004 + bounce;
     }
   }
-  return { root, update };
+  const poke = (c, t) => { const k = chars.find(k => k.c === c); if (k) k.hop = t; };
+  return { root, update, hit, poke };
 }
